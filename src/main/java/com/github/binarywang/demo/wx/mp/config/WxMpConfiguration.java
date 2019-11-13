@@ -2,13 +2,18 @@ package com.github.binarywang.demo.wx.mp.config;
 
 import com.github.binarywang.demo.wx.mp.handler.*;
 import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import me.chanjar.weixin.mp.api.WxMpMessageRouter;
 import me.chanjar.weixin.mp.api.WxMpService;
 import me.chanjar.weixin.mp.api.impl.WxMpServiceImpl;
 import me.chanjar.weixin.mp.config.impl.WxMpDefaultConfigImpl;
+import me.chanjar.weixin.mp.config.impl.WxMpRedisConfigImpl;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.JedisPoolConfig;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,7 +33,7 @@ import static me.chanjar.weixin.mp.constant.WxMpEventConstants.POI_CHECK_NOTIFY;
  */
 @AllArgsConstructor
 @Configuration
-@EnableConfigurationProperties(WxMpProperties.class)
+@EnableConfigurationProperties({WxMpProperties.class,RedisProperties.class})
 public class WxMpConfiguration {
     private final LogHandler logHandler;
     private final NullHandler nullHandler;
@@ -41,6 +46,10 @@ public class WxMpConfiguration {
     private final SubscribeHandler subscribeHandler;
     private final ScanHandler scanHandler;
     private final WxMpProperties properties;
+    private final RedisProperties redisProperties;
+
+    @Autowired(required = false)
+    private JedisPool jedisPool;
 
     @Bean
     public WxMpService wxMpService() {
@@ -53,7 +62,7 @@ public class WxMpConfiguration {
         WxMpService service = new WxMpServiceImpl();
         service.setMultiConfigStorages(configs
             .stream().map(a -> {
-                WxMpDefaultConfigImpl configStorage = new WxMpDefaultConfigImpl();
+                WxMpDefaultConfigImpl configStorage = getWxMpInRedisConfigStorage();
                 configStorage.setAppId(a.getAppId());
                 configStorage.setSecret(a.getSecret());
                 configStorage.setToken(a.getToken());
@@ -106,6 +115,40 @@ public class WxMpConfiguration {
         newRouter.rule().async(false).handler(this.msgHandler).end();
 
         return newRouter;
+    }
+
+    private WxMpRedisConfigImpl getWxMpInRedisConfigStorage() {
+        JedisPool poolToUse = jedisPool;
+        if (poolToUse == null) {
+            poolToUse = getJedisPool();
+        }
+        WxMpRedisConfigImpl config = new WxMpRedisConfigImpl(poolToUse);
+        return config;
+    }
+
+    private JedisPool getJedisPool() {
+
+        RedisProperties redis = this.redisProperties;
+
+        JedisPoolConfig config = new JedisPoolConfig();
+        if (redis.getMaxActive() != null) {
+            config.setMaxTotal(redis.getMaxActive());
+        }
+        if (redis.getMaxIdle() != null) {
+            config.setMaxIdle(redis.getMaxIdle());
+        }
+        if (redis.getMaxWaitMillis() != null) {
+            config.setMaxWaitMillis(redis.getMaxWaitMillis());
+        }
+        if (redis.getMinIdle() != null) {
+            config.setMinIdle(redis.getMinIdle());
+        }
+        config.setTestOnBorrow(true);
+        config.setTestWhileIdle(true);
+
+        JedisPool pool = new JedisPool(config, redis.getHost(), redis.getPort(),
+            redis.getTimeout(), redis.getPassword(), redis.getDatabase());
+        return pool;
     }
 
 }
