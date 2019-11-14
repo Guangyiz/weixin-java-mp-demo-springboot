@@ -3,6 +3,7 @@ package com.github.binarywang.demo.wx.mp.config;
 import com.github.binarywang.demo.wx.mp.handler.*;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import me.chanjar.weixin.mp.api.WxMpMessageRouter;
 import me.chanjar.weixin.mp.api.WxMpService;
 import me.chanjar.weixin.mp.api.impl.WxMpServiceImpl;
@@ -31,7 +32,7 @@ import static me.chanjar.weixin.mp.constant.WxMpEventConstants.POI_CHECK_NOTIFY;
  *
  * @author Binary Wang(https://github.com/binarywang)
  */
-@AllArgsConstructor
+@RequiredArgsConstructor
 @Configuration
 @EnableConfigurationProperties({WxMpProperties.class,RedisProperties.class})
 public class WxMpConfiguration {
@@ -121,6 +122,7 @@ public class WxMpConfiguration {
         JedisPool poolToUse = jedisPool;
         if (poolToUse == null) {
             poolToUse = getJedisPool();
+            jedisPool = poolToUse;
         }
         WxMpRedisConfigImpl config = new WxMpRedisConfigImpl(poolToUse);
         return config;
